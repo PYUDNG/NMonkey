@@ -1,44 +1,26 @@
-(function mainFunc() {
-	'use strict';
+(function __MAIN__() {
+    'use strict';
 
-	var NMonkey_Ready = NMonkey({
-		mainFunc: mainFunc, 
-		name: 'NMonkey Example',
-		requires: [
-			{
-				src: 'https://cdn.jsdelivr.net/gh/MohammadYounes/AlertifyJS@3151fa0d65909936afcbb2f1665ed4f20767bee5/build/alertify.min.js',
-				loaded: () => (typeof(alertify) === 'object' ? true : false),
-				execmode: 'function'
+	// Polyfills
+	const script_name = 'NMonkey Example';
+	const script_version = '0.1';
+	const NMonkey_Info = {
+		GM_info: {
+			script: {
+				name: script_name,
+				author: 'PY-DNG',
+				version: script_version
 			}
-		],
-		resources: [
-			{
-				src: 'https://cdn.jsdelivr.net/gh/MohammadYounes/AlertifyJS@3151fa0d65909936afcbb2f1665ed4f20767bee5/build/css/alertify.min.css',
-				name: 'alertify-css'
-			},
-			{
-				src: 'https://cdn.jsdelivr.net/gh/MohammadYounes/AlertifyJS@3151fa0d65909936afcbb2f1665ed4f20767bee5/build/css/themes/default.min.css',
-				name: 'alertify-theme'
-			}
-		]
-	});
-	if (!NMonkey_Ready) {
-		return false;
+		},
+		mainFunc: __MAIN__
 	};
-
-	// Main Code ...
-	console.log('Main function executing in strict mode, GM_* functions are: ');
-	console.log(GM_setValue, GM_getValue, GM_deleteValue, GM_listValues, GM_xmlhttpRequest, GM_openInTab, GM_setClipboard, unsafeWindow);
-
-	GM_addStyle(GM_getResourceText('alertify-css'));
-	GM_addStyle(GM_getResourceText('alertify-theme'));
-	alertify.notify('Main function executed');
-	debugger;
-
+	const NMonkey_Ready = NMonkey(NMonkey_Info);
+	if (!NMonkey_Ready) {return false;}
+	
 	// NMonkey By PY-DNG, 2021.07.18 - 2022.02.18, License GPL-3
 	// NMonkey: Provides GM_Polyfills and make your userscript compatible with non-script-manager environment
 	// Description:
-	/* 
+	/*
 	    Simulates a script-manager environment("NMonkey Environment") for non-script-manager browser, load @require & @resource, provides some GM_functions(listed below), and also compatible with script-manager environment.
 	    Provides GM_setValue, GM_getValue, GM_deleteValue, GM_listValues, GM_xmlhttpRequest, GM_openInTab, GM_setClipboard, GM_getResourceText, GM_getResourceURL, GM_addStyle, GM_addElement, GM_log, unsafeWindow(object), GM_info(object)
 	    Also provides an object called GM_POLYFILLED which has the following properties that shows you which GM_functions are actually polyfilled.
@@ -46,7 +28,7 @@
 	*/
 	// Note: DO NOT DEFINE GM-FUNCTION-NAMES IN YOUR CODE. DO NOT DEFINE GM_POLYFILLED AS WELL.
 	// Note: NMonkey is an advanced version of GM_PolyFill (and BypassXB), it includes more functions than GM_PolyFill, and provides better stability and compatibility. Do NOT use NMonkey and GM_PolyFill (and BypassXB) together in one script.
-	// Usage: 
+	// Usage:
 	/*
 		// ==UserScript==
 		// @name      xxx
@@ -71,6 +53,7 @@
 				name: "script-storage-key, aims to separate different scripts' storage area. Use your script's @namespace value if you don't how to fill this field.",
 				requires: [
 					{
+						name: "", // Optional, used to display loading error messages if anything went wrong while loading this item
 						src: "https://.../xxx.js",
 						loaded: function() {return boolean_value_shows_whether_this_js_has_already_loaded;}
 						execmode: "'eval' for eval code in current scope or 'function' for Function(code)() in global scope or 'script' for inserting a <script> element to document.head"
@@ -129,6 +112,15 @@
 		// Oh you want to write something here? Fine. But code you write here cannot get into the simulated script-manager-environment.
 	*/
 	function NMonkey(details) {
+		// Constances
+		const CONST = {
+			Text: {
+				Require_Load_Failed: '动态加载依赖js库失败（自动重试也都失败了），请刷新页面后再试:(\n一共尝试了{I}个备用加载源\n加载项目：{N}',
+				Resource_Load_Failed: '动态加载依赖resource资源失败（自动重试也都失败了），请刷新页面后再试:(\n一共尝试了{I}个备用加载源\n加载项目：{N}',
+				UnkownItem: '未知项目',
+			}
+		};
+
 		// Init DoLog
 		DoLog();
 
@@ -147,11 +139,7 @@
 			return true;
 		}
 
-		// Not in polifilled environment, then polyfill functions and create & move into the environment
-		// Bypass xbrowser's useless GM_functions
-		bypassXB();
-
-		// Start polyfill
+		// Polyfill functions and data
 		const GM_POLYFILL_KEY_STORAGE = 'GM_STORAGE_POLYFILL';
 		let GM_POLYFILL_storage;
 		const Supports = {
@@ -348,6 +336,10 @@
 			_GM_POLYFILLED[pname] = true;
 		}
 
+		// Not in polifilled environment, then polyfill functions and create & move into the environment
+		// Bypass xbrowser's useless GM_functions
+		bypassXB();
+
 		// Create & move into polifilled environment
 		ExecInNPEnv();
 
@@ -363,11 +355,11 @@
 					'GM_setValue',
 					'GM_listValues',
 					'GM_deleteValue',
-					'GM_xmlhttpRequest'
+					//'GM_xmlhttpRequest',
 				];
 				for (const GM_func of GM_funcs) {
 					window[GM_func] = undefined;
-					eval('typeof({F}) === "function" && ({F} = undefined);'.replaceAll('{F}', GM_func));
+					eval('typeof({F}) === "function" && ({F} = Provides.{F});'.replaceAll('{F}', GM_func));
 				}
 				// Delete dirty data saved by these stupid functions before
 				for (let i = 0; i < localStorage.length; i++) {
@@ -381,7 +373,7 @@
 		// Check if already in name-predefined environment
 		// I think there won't be anyone else wants to use this fxxking variable name...
 		function InNPEnvironment() {
-			return (typeof(GM_POLYFILLED) === 'object' && GM_POLYFILLED !== null) ? true : false;
+			return (typeof(GM_POLYFILLED) === 'object' && GM_POLYFILLED !== null && GM_POLYFILLED !== window.GM_POLYFILLED) ? true : false;
 		}
 
 		function ExecInNPEnv() {
@@ -409,7 +401,7 @@
 			// Make name code
 			for (let i = 0; i < fnames.length; i++) {
 				const fname = fnames[i];
-				const exist = eval('typeof ' + fname) !== 'undefined' ? true : false;
+				const exist = eval('typeof ' + fname + ' !== "undefined"') && fname !== 'GM_POLYFILLED';
 				argvlist[i] = exist ? fname : (Provides.hasOwnProperty(fname) ? 'Provides.'+fname : '');
 				argvs[i] = exist ? eval(fname) : (Provides.hasOwnProperty(fname) ? Provides[name] : undefined);
 				pnames.includes(fname) && (_GM_POLYFILLED[fname] = !exist);
@@ -424,7 +416,7 @@
 					const content = require.content;
 					if (!content) {continue;}
 					switch(mode) {
-						case 'eval': 
+						case 'eval':
 							requirecode += content + '\n';
 							break;
 						case 'function': {
@@ -439,11 +431,10 @@
 							break;
 						}
 					}
-					
 				}
 
 				// Make final code & eval
-				const varnames = ['NG', 'tnames', 'pnames', 'fnames', 'argvist', 'argvs', 'code', 'finalcode', 'wrapper', 'ExecInNPEnv', 'GM_POLYFILL_KEY_STORAGE', 'GM_POLYFILL_storage', 'InNPEnvironment', 'NameGenerator', 'LocalCDN', 'loadRequires', 'requestText', 'Provides', 'Supports', 'bypassXB', 'details', 'mainFunc', 'name', 'requires', 'resources', '_GM_POLYFILLED', 'NMonkey', 'polyfill_status'];
+				const varnames = ['NG', 'tnames', 'pnames', 'fnames', 'argvist', 'argvs', 'code', 'finalcode', 'wrapper', 'ExecInNPEnv', 'GM_POLYFILL_KEY_STORAGE', 'GM_POLYFILL_storage', 'InNPEnvironment', 'NameGenerator', 'LocalCDN', 'loadRequires', 'requestText', 'Provides', 'Supports', 'bypassXB', 'details', 'mainFunc', 'name', 'requires', 'resources', '_GM_POLYFILLED', 'CONST', 'NMonkey', 'polyfill_status'];
 				const code = requirecode + 'let ' + varnames.join(', ') + ';\n(' + mainFunc.toString() + ') ();';
 				const wrapper = Function.apply(null, fnames.concat(code));
 				const finalcode = '(' + wrapper.toString() + ').apply(this, [' + argvlist.join(', ') + ']);';
@@ -509,22 +500,50 @@
 
 			function loadinJs(js) {
 				AM.add();
-				LCDN.get(js.src, function(content) {
+
+				const srclist = js.srcset ? LCDN.sort(js.srcset).srclist : [];
+				let i = -1;
+				LCDN.get(js.src, onload, [], onfail);
+
+				function onload(content) {
 					js.content = content;
 					AM.finish();
-				});
+				}
+
+				function onfail() {
+					i++;
+					if (i < srclist.length) {
+						LCDN.get(srclist[i], onload, [], onfail);
+					} else {
+						alert(CONST.Text.Require_Load_Failed.replace('{I}', i.toString()).replace('{N}', js.name ? js.name : CONST.Text.UnkownItem));
+					}
+				}
 			}
 
 			function loadinResource(resource) {
 				let content;
-				if (typeof(GM_getResourceText) === 'function' && (content = GM_getResourceText(resource.name))) {
+				if (typeof GM_getResourceText === 'function' && (content = GM_getResourceText(resource.name))) {
 					resource.content = content;
 				} else {
 					AM.add();
-					LCDN.get(resource.src, function(content) {
+
+					let i = -1;
+					LCDN.get(resource.src, onload, [], onfail);
+
+					function onload(content) {
 						resource.content = content;
 						AM.finish();
-					});
+					}
+
+					function onfail(content) {
+						i++;
+						if (resource.srcset && i < resource.srcset.length) {
+							LCDN.get(resource.srcset[i], onload, [], onfail);
+						} else {
+							debugger;
+							alert(CONST.Text.Resource_Load_Failed.replace('{I}', i.toString()).replace('{N}', js.name ? js.name : CONST.Text.UnkownItem));
+						}
+					}
 				}
 			}
 		}
@@ -540,40 +559,45 @@
 
 			const KEY_LOCALCDN = 'LOCAL-CDN';
 			const KEY_LOCALCDN_VERSION = 'version';
-			const VALUE_LOCALCDN_VERSION = '0.2';
+			const VALUE_LOCALCDN_VERSION = '0.3';
 
 			// Default expire time (by hour)
 			LC.expire = 72;
 
 			// Try to get resource content from loaclCDN first, if failed/timeout, request from web && save to LocalCDN
-			// Accepts callback only
+			// Accepts callback only: onload & onfail(optional)
 			// Returns true if got from LocalCDN, false if got from web
-			LC.get = function(url, callback, args=[]) {
+			LC.get = function(url, onload, args=[], onfail=function(){}) {
 				const CDN = _GM_getValue(KEY_LOCALCDN, {});
 				const resource = CDN[url];
 				const time = (new Date()).getTime();
 
-				if (resource && !expired(time, resource.time)) {
-					callback.apply(null, [resource.content].concat(args));
+				if (resource && resource.content !== null && !expired(time, resource.time)) {
+					onload.apply(null, [resource.content].concat(args));
 					return true;
 				} else {
-					LC.request(url, function(content) {
-						callback.apply(null, [content].concat(args));
-					});
+					LC.request(url, _onload, [], onfail);
 					return false;
+				}
+
+				function _onload(content) {
+					onload.apply(null, [content].concat(args));
 				}
 			}
 
 			// Generate resource obj and set to CDN[url]
 			// Returns resource obj
+			// Provide content means load success, provide null as content means load failed
 			LC.set = function(url, content) {
 				const CDN = _GM_getValue(KEY_LOCALCDN, {});
 				const time = (new Date()).getTime();
 				const resource = {
 					url: url,
 					time: time,
-					content: content
-				}
+					content: content,
+					success: content !== null ? (CDN[url] ? CDN[url].success + 1 : 1) : (CDN[url] ? CDN[url].success : 0),
+					fail: content === null ? (CDN[url] ? CDN[url].fail + 1 : 1) : (CDN[url] ? CDN[url].fail : 0),
+				};
 				CDN[url] = resource;
 				_GM_setValue(KEY_LOCALCDN, CDN);
 				return resource;
@@ -601,37 +625,29 @@
 			LC.list = function() {
 				const CDN = _GM_getValue(KEY_LOCALCDN, {});
 				const urls = LC.listurls();
-				const resources = [];
-
-				for (const url of urls) {
-					resources.push(CDN[url]);
-				}
-
-				return resources;
+				return LC.listurls().map((url) => (CDN[url]));
 			}
 
 			// List all resource's url saved in LocalCDN
 			LC.listurls = function() {
-				const CDN = _GM_getValue(KEY_LOCALCDN, {});
-				const keys = Object.keys(CDN);
-				const urls = [];
-
-				for (const key of keys) {
-					if (key === KEY_LOCALCDN_VERSION) {continue;}
-					urls.push(key);
-				}
-
-				return urls;
+				return Object.keys(_GM_getValue(KEY_LOCALCDN, {})).filter((url) => (url !== KEY_LOCALCDN_VERSION));
 			}
 
 			// Request content from web and save it to CDN[url]
-			// Accepts callback only
-			LC.request = function(url, callback, args=[]) {
+			// Accepts callbacks only: onload & onfail(optional)
+			LC.request = function(url, onload, args=[], onfail=function(){}) {
 				const CDN = _GM_getValue(KEY_LOCALCDN, {});
-				requestText(url, function(content) {
+				requestText(url, _onload, [], _onfail);
+
+				function _onload(content) {
 					LC.set(url, content);
-					callback.apply(null, [content].concat(args));
-				});
+					onload.apply(null, [content].concat(args));
+				}
+
+				function _onfail() {
+					LC.set(url, null);
+					onfail();
+				}
 			}
 
 			// Re-request all resources in CDN instantly, ignoring LC.expire
@@ -653,6 +669,58 @@
 				AM.finishEvent = true;
 			}
 
+			// Sort src && srcset, to get a best request sorting
+			LC.sort = function(srcset) {
+				const CDN = _GM_getValue(KEY_LOCALCDN, {});
+				const result = {srclist: [], lists: []};
+				const lists = result.lists;
+				const srclist = result.srclist;
+				const suc_rec = lists[0] = []; // Recent successes take second (not expired yet)
+				const suc_old = lists[1] = []; // Old successes take third
+				const fails   = lists[2] = []; // Fails & unused take the last place
+				const time = (new Date()).getTime();
+
+				// Make lists
+				for (const s of srcset) {
+					const resource = CDN[s];
+					if (resource && resource.content !== null) {
+						if (!expired(resource.time, time)) {
+							suc_rec.push(s);
+						} else {
+							suc_old.push(s);
+						}
+					} else {
+						fails.push(s);
+					}
+				}
+
+				// Sort lists
+				// Recently successed: Choose most recent ones
+				suc_rec.sort((res1, res2) => (res2.time - res1.time));
+				// Successed long ago or failed: Sort by success rate & tried time
+				[suc_old, fails].forEach((arr) => (arr.sort(sorting)));
+
+				// Push all resources into seclist
+				[suc_rec, suc_old, fails].forEach((arr) => (arr.forEach((res) => (srclist.push(res)))));
+
+				DoLog(['LocalCDN: sorted', result]);
+				return result;
+
+				function sorting(res1, res2) {
+					const sucRate1 = (res1.success+1) / (res1.fail+1);
+					const sucRate2 = (res2.success+1) / (res2.fail+1);
+
+					if (sucRate1 !== sucRate2) {
+						// Success rate: high to low
+						return sucRate2 - sucRate1;
+					} else {
+						// Tried time: less to more
+						// Less tried time means newer added source
+						return (res1.success+res1.fail) - (res2.success+res2.fail);
+					}
+				}
+			}
+
 			function upgradeConfig() {
 				const CDN = _GM_getValue(KEY_LOCALCDN, {});
 				switch(CDN[KEY_LOCALCDN_VERSION]) {
@@ -661,6 +729,11 @@
 						break;
 					case '0.1':
 						v01_To_v02();
+						logUpgrade();
+						break;
+					case '0.2':
+						v01_To_v02();
+						v02_To_v03();
 						logUpgrade();
 						break;
 					case VALUE_LOCALCDN_VERSION:
@@ -691,6 +764,13 @@
 						};
 					}
 				}
+
+				function v02_To_v03() {
+					const urls = LC.listurls();
+					for (const url of urls) {
+						CDN[url].success = CDN[url].fail = 0;
+					}
+				}
 			}
 
 			function clearExpired() {
@@ -703,24 +783,28 @@
 			}
 
 			function expired(t1, t2) {
-				return (t2 - t1) > (LC.expire * 60 * 60 * 1000);
+				return (t1 - t2) > (LC.expire * 60 * 60 * 1000);
 			}
 
 			upgradeConfig();
 			clearExpired();
 		}
 
-		function requestText(url, callback, args=[]) {
+		function requestText(url, callback, args=[], onfail=function(){}) {
 			const req = typeof(GM_xmlhttpRequest) === 'function' ? GM_xmlhttpRequest : Provides.GM_xmlhttpRequest;
 			req({
 	            method:       'GET',
 	            url:          url,
 	            responseType: 'text',
+				timeout:      45*1000,
 	            onload:       function(response) {
 	                const text = response.responseText;
 					const argvs = [text].concat(args);
 	                callback.apply(null, argvs);
-	            }
+	            },
+				onerror:      onfail,
+				ontimeout:    onfail,
+				onabort:      onfail,
 	        })
 		}
 
@@ -824,4 +908,4 @@
 	        }
 	    }
 	}
-}) ();
+})();
